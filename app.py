@@ -31,6 +31,8 @@ if "search_results" not in st.session_state:
     st.session_state.search_results = []
 if "search_executed" not in st.session_state:
     st.session_state.search_executed = False
+if "raw_api_results" not in st.session_state:
+    st.session_state.raw_api_results = []
 
 keywords = []
 selected_expansions = {}
@@ -94,6 +96,11 @@ with st.sidebar:
     max_results = st.slider("최대 결과 수", 10, 200, 50)
     
     st.markdown("---")
+    
+    # 디버깅 모드 추가
+    debug_mode = st.checkbox("🔧 디버깅 모드 (API 원본 결과 보기)", value=False)
+    
+    st.markdown("---")
     search_button = st.button("🔍 검색 시작", type="primary", use_container_width=True)
 
 st.markdown('<p class="main-header">📚 Research Paper Tracker</p>', unsafe_allow_html=True)
@@ -115,6 +122,18 @@ if search_button:
                 st.info(f"🔍 검색 키워드: {', '.join(search_keywords[:5])}{'...' if len(search_keywords) > 5 else ''}")
                 st.info(f"📚 타겟 저널 수: {len(target_journals)}개 | 📅 검색 기간: {year_start}-{year_end}")
                 
+                # API 원본 결과 저장 (디버깅용)
+                query = " OR ".join(search_keywords)
+                raw_papers = search_papers(
+                    query=query,
+                    year_start=int(year_start),
+                    year_end=int(year_end),
+                    min_citations=int(min_citations),
+                    limit=int(max_results)
+                )
+                st.session_state.raw_api_results = raw_papers
+                
+                # 필터링된 결과
                 results = search_and_filter(
                     keywords=search_keywords,
                     target_journals=target_journals,
@@ -129,13 +148,35 @@ if search_button:
                 st.session_state.search_results = results
                 st.session_state.search_executed = True
                 
+                # 디버깅 정보
+                st.info(f"📊 API 원본 결과: {len(raw_papers)}개 → 필터링 후: {len(results)}개")
+                
                 if results:
                     st.success(f"✅ {len(results)}개의 논문을 찾았습니다!")
                 else:
-                    st.warning("⚠️ 검색 결과가 없습니다. 다른 키워드나 더 넓은 연도 범위로 시도해보세요.")
+                    st.warning("⚠️ 필터링 후 결과가 없습니다. 아래 디버깅 모드를 켜서 API 원본 결과를 확인해보세요.")
             except Exception as e:
                 st.error(f"❌ 검색 중 오류 발생: {str(e)}")
                 st.session_state.search_results = []
+
+# 디버깅 모드: API 원본 결과 표시
+if debug_mode and st.session_state.raw_api_results:
+    st.markdown("### 🔧 디버깅: API 원본 결과")
+    st.markdown(f"**API가 반환한 논문 수:** {len(st.session_state.raw_api_results)}개")
+    
+    st.markdown("**저널(venue) 목록 (API 반환값):**")
+    venues = [p.get("venue", "N/A") for p in st.session_state.raw_api_results[:20]]
+    for i, v in enumerate(venues):
+        st.text(f"{i+1}. {v}")
+    
+    with st.expander("📋 원본 데이터 샘플 (처음 3개)"):
+        for i, paper in enumerate(st.session_state.raw_api_results[:3]):
+            st.json({
+                "title": paper.get("title"),
+                "venue": paper.get("venue"),
+                "year": paper.get("year"),
+                "citationCount": paper.get("citationCount")
+            })
 
 results = st.session_state.search_results
 
@@ -229,6 +270,7 @@ else:
         **2. 저널 필터** - Track A (핵심 저널) / Track B (확장 저널)
         **3. 결과 표시** - High/Medium/Low Priority
         **4. 내보내기** - CSV, BibTeX
+        **5. 디버깅 모드** - API 원본 결과 확인 가능
         """)
     
     st.markdown("### 📌 저장된 연구 주제 프리셋")
