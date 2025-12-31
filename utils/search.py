@@ -2,13 +2,10 @@
 # Semantic Scholar API를 활용한 논문 검색
 
 import requests
-import time
 from typing import List, Dict, Optional
 from datetime import datetime
 
-# Semantic Scholar API 설정
 SEMANTIC_SCHOLAR_API = "https://api.semanticscholar.org/graph/v1"
-RATE_LIMIT_DELAY = 1.0  # API 호출 간 딜레이 (초)
 
 def search_papers(
     query: str,
@@ -78,8 +75,7 @@ def check_relevance(
                 break
             target_words = set(target_lower.split())
             venue_words = set(venue.split())
-            common_words = target_words & venue_words
-            if len(common_words) >= 2:
+            if len(target_words & venue_words) >= 2:
                 is_target = True
                 break
     
@@ -87,40 +83,25 @@ def check_relevance(
     has_keyword = any(k in text for k in keywords_lower)
     
     if is_target and has_keyword:
-        return {
-            "priority": "High",
-            "track": "Core Journal",
-            "reason": "타겟 저널 + 키워드 매칭"
-        }
+        return {"priority": "High", "track": "Core Journal", "reason": "타겟 저널 + 키워드 매칭"}
     
     has_context = any(c in text for c in context_keywords)
     
     if has_context and has_keyword:
-        return {
-            "priority": "Medium",
-            "track": "Discovery",
-            "reason": "맥락 + 기술 키워드 동시 매칭"
-        }
+        return {"priority": "Medium", "track": "Discovery", "reason": "맥락 + 기술 키워드 동시 매칭"}
     
     if has_keyword and not strict_journal_filter:
-        return {
-            "priority": "Low",
-            "track": "Keyword Match",
-            "reason": "키워드 매칭"
-        }
+        return {"priority": "Low", "track": "Keyword Match", "reason": "키워드 매칭"}
     
     return None
 
 def format_authors(authors: List[Dict]) -> str:
     if not authors:
         return "Unknown"
-    
     names = [a.get("name", "Unknown") for a in authors[:3]]
     result = ", ".join(names)
-    
     if len(authors) > 3:
         result += f" et al. ({len(authors)} authors)"
-    
     return result
 
 def format_paper_for_display(paper: Dict, relevance: Dict = None) -> Dict:
@@ -168,12 +149,7 @@ def search_and_filter(
     
     results = []
     for paper in papers:
-        relevance = check_relevance(
-            paper, 
-            keywords, 
-            all_target,
-            strict_journal_filter=strict_journal_filter
-        )
+        relevance = check_relevance(paper, keywords, all_target, strict_journal_filter=strict_journal_filter)
         if relevance:
             formatted = format_paper_for_display(paper, relevance)
             results.append(formatted)
